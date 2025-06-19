@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.workspace.mapper.AiDataRecordMapper">
+
+    <resultMap type="com.ruoyi.workspace.domain.AiDataRecord" id="AiDataRecordResult">
+        <result property="recordId"    column="record_id"    />
+        <result property="tableId"     column="table_id"     />
+        <result property="recordData"  column="record_data"  />
+        <result property="status"      column="status"       />
+        <result property="delFlag"     column="del_flag"     />
+        <result property="createBy"    column="create_by"    />
+        <result property="createTime"  column="create_time"  />
+        <result property="updateBy"    column="update_by"    />
+        <result property="updateTime"  column="update_time"  />
+        <result property="remark"      column="remark"       />
+    </resultMap>
+
+    <sql id="selectAiDataRecordVo">
+        select record_id, table_id, record_data, status, del_flag, create_by, create_time, update_by, update_time, remark from ai_data_record
+    </sql>
+
+    <select id="selectAiDataRecordList" parameterType="com.ruoyi.workspace.domain.AiDataRecord" resultMap="AiDataRecordResult">
+        <include refid="selectAiDataRecordVo"/>
+        <where>
+            <if test="tableId != null "> and table_id = #{tableId}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            <!-- Add other query conditions if needed, e.g., for record_data JSON content -->
+            and del_flag = '0'
+        </where>
+        order by create_time desc
+    </select>
+
+    <select id="selectAiDataRecordByRecordId" parameterType="Long" resultMap="AiDataRecordResult">
+        <include refid="selectAiDataRecordVo"/>
+        where record_id = #{recordId} and del_flag = '0'
+    </select>
+
+    <insert id="insertAiDataRecord" parameterType="com.ruoyi.workspace.domain.AiDataRecord" useGeneratedKeys="true" keyProperty="recordId">
+        insert into ai_data_record
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="tableId != null">table_id,</if>
+            <if test="recordData != null and recordData != ''">record_data,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="delFlag != null and delFlag != ''">del_flag,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time,
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="tableId != null">#{tableId},</if>
+            <if test="recordData != null and recordData != ''">#{recordData, jdbcType=VARCHAR},</if> <!-- Specify jdbcType for JSON if needed, though often not required with modern drivers -->
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="delFlag != null and delFlag != ''">#{delFlag},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate(),
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiDataRecord" parameterType="com.ruoyi.workspace.domain.AiDataRecord">
+        update ai_data_record
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="tableId != null">table_id = #{tableId},</if>
+            <if test="recordData != null and recordData != ''">record_data = #{recordData, jdbcType=VARCHAR},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate(),
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where record_id = #{recordId}
+    </update>
+
+    <update id="deleteAiDataRecordByRecordId" parameterType="Long">
+        update ai_data_record set del_flag = '2' where record_id = #{recordId}
+    </update>
+
+    <update id="deleteAiDataRecordByRecordIds" parameterType="String">
+        update ai_data_record set del_flag = '2' where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </update>
+
+    <update id="deleteAiDataRecordByTableIds" parameterType="String">
+        update ai_data_record set del_flag = '2' where table_id in
+        <foreach item="tableId" collection="array" open="(" separator="," close=")">
+            #{tableId}
+        </foreach>
+    </update>
+</mapper>

@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.workspace.mapper.AiTableFieldMapper">
+
+    <resultMap type="com.ruoyi.workspace.domain.AiTableField" id="AiTableFieldResult">
+        <result property="fieldId"          column="field_id"          />
+        <result property="tableId"          column="table_id"          />
+        <result property="fieldName"        column="field_name"        />
+        <result property="fieldLabel"       column="field_label"       />
+        <result property="fieldType"        column="field_type"        />
+        <result property="fieldDescription" column="field_description" />
+        <result property="isRequired"       column="is_required"       />
+        <result property="defaultValue"     column="default_value"     />
+        <result property="fieldOptions"     column="field_options"     />
+        <result property="extractionPrompt" column="extraction_prompt" />
+        <result property="sortOrder"        column="sort_order"        />
+        <result property="status"           column="status"            />
+        <result property="delFlag"          column="del_flag"          />
+        <result property="createBy"         column="create_by"         />
+        <result property="createTime"       column="create_time"       />
+        <result property="updateBy"         column="update_by"         />
+        <result property="updateTime"       column="update_time"       />
+        <result property="remark"           column="remark"            />
+    </resultMap>
+
+    <sql id="selectAiTableFieldVo">
+        select field_id, table_id, field_name, field_label, field_type, field_description, is_required, default_value, field_options, extraction_prompt, sort_order, status, del_flag, create_by, create_time, update_by, update_time, remark from ai_table_field
+    </sql>
+
+    <select id="selectAiTableFieldList" parameterType="com.ruoyi.workspace.domain.AiTableField" resultMap="AiTableFieldResult">
+        <include refid="selectAiTableFieldVo"/>
+        <where>
+            <if test="tableId != null "> and table_id = #{tableId}</if>
+            <if test="fieldName != null  and fieldName != ''"> and field_name like concat('%', #{fieldName}, '%')</if>
+            <if test="fieldLabel != null  and fieldLabel != ''"> and field_label like concat('%', #{fieldLabel}, '%')</if>
+            <if test="fieldType != null  and fieldType != ''"> and field_type = #{fieldType}</if>
+            <if test="status != null  and status != ''"> and status = #{status}</if>
+            and del_flag = '0'
+        </where>
+        order by sort_order asc, create_time asc
+    </select>
+
+    <select id="selectAiTableFieldListByTableId" parameterType="Long" resultMap="AiTableFieldResult">
+        <include refid="selectAiTableFieldVo"/>
+        where table_id = #{tableId} and del_flag = '0'
+        order by sort_order asc, create_time asc
+    </select>
+
+    <select id="selectAiTableFieldByFieldId" parameterType="Long" resultMap="AiTableFieldResult">
+        <include refid="selectAiTableFieldVo"/>
+        where field_id = #{fieldId} and del_flag = '0'
+    </select>
+
+    <insert id="insertAiTableField" parameterType="com.ruoyi.workspace.domain.AiTableField" useGeneratedKeys="true" keyProperty="fieldId">
+        insert into ai_table_field
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="tableId != null">table_id,</if>
+            <if test="fieldName != null and fieldName != ''">field_name,</if>
+            <if test="fieldLabel != null and fieldLabel != ''">field_label,</if>
+            <if test="fieldType != null and fieldType != ''">field_type,</if>
+            <if test="fieldDescription != null">field_description,</if>
+            <if test="isRequired != null">is_required,</if>
+            <if test="defaultValue != null">default_value,</if>
+            <if test="fieldOptions != null">field_options,</if>
+            <if test="extractionPrompt != null">extraction_prompt,</if>
+            <if test="sortOrder != null">sort_order,</if>
+            <if test="status != null and status != ''">status,</if>
+            <if test="delFlag != null and delFlag != ''">del_flag,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time,
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="tableId != null">#{tableId},</if>
+            <if test="fieldName != null and fieldName != ''">#{fieldName},</if>
+            <if test="fieldLabel != null and fieldLabel != ''">#{fieldLabel},</if>
+            <if test="fieldType != null and fieldType != ''">#{fieldType},</if>
+            <if test="fieldDescription != null">#{fieldDescription},</if>
+            <if test="isRequired != null">#{isRequired},</if>
+            <if test="defaultValue != null">#{defaultValue},</if>
+            <if test="fieldOptions != null">#{fieldOptions},</if>
+            <if test="extractionPrompt != null">#{extractionPrompt},</if>
+            <if test="sortOrder != null">#{sortOrder},</if>
+            <if test="status != null and status != ''">#{status},</if>
+            <if test="delFlag != null and delFlag != ''">#{delFlag},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate(),
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiTableField" parameterType="com.ruoyi.workspace.domain.AiTableField">
+        update ai_table_field
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="tableId != null">table_id = #{tableId},</if>
+            <if test="fieldName != null and fieldName != ''">field_name = #{fieldName},</if>
+            <if test="fieldLabel != null and fieldLabel != ''">field_label = #{fieldLabel},</if>
+            <if test="fieldType != null and fieldType != ''">field_type = #{fieldType},</if>
+            <if test="fieldDescription != null">field_description = #{fieldDescription},</if>
+            <if test="isRequired != null">is_required = #{isRequired},</if>
+            <if test="defaultValue != null">default_value = #{defaultValue},</if>
+            <if test="fieldOptions != null">field_options = #{fieldOptions},</if>
+            <if test="extractionPrompt != null">extraction_prompt = #{extractionPrompt},</if>
+            <if test="sortOrder != null">sort_order = #{sortOrder},</if>
+            <if test="status != null and status != ''">status = #{status},</if>
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate(),
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where field_id = #{fieldId}
+    </update>
+
+    <update id="deleteAiTableFieldByFieldId" parameterType="Long">
+        update ai_table_field set del_flag = '2' where field_id = #{fieldId}
+    </update>
+
+    <update id="deleteAiTableFieldByFieldIds" parameterType="String">
+        update ai_table_field set del_flag = '2' where field_id in
+        <foreach item="fieldId" collection="array" open="(" separator="," close=")">
+            #{fieldId}
+        </foreach>
+    </update>
+
+    <update id="deleteAiTableFieldByTableIds" parameterType="String">
+        update ai_table_field set del_flag = '2' where table_id in
+        <foreach item="tableId" collection="array" open="(" separator="," close=")">
+            #{tableId}
+        </foreach>
+    </update>
+</mapper>

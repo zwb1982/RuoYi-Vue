@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.ruoyi.workspace.mapper.AiRecordFileRelationMapper">
+
+    <resultMap type="com.ruoyi.workspace.domain.AiRecordFileRelation" id="AiRecordFileRelationResult">
+        <result property="relationId"   column="relation_id"   />
+        <result property="recordId"     column="record_id"     />
+        <result property="fieldId"      column="field_id"      />
+        <result property="filePath"     column="file_path"     />
+        <result property="fileName"     column="file_name"     />
+        <result property="fileSize"     column="file_size"     />
+        <result property="fileType"     column="file_type"     />
+        <result property="uploadTime"   column="upload_time"   />
+        <result property="delFlag"      column="del_flag"      />
+        <result property="createBy"     column="create_by"     />
+        <result property="createTime"   column="create_time"   />
+        <result property="updateBy"     column="update_by"     />
+        <result property="updateTime"   column="update_time"   />
+        <result property="remark"       column="remark"        />
+    </resultMap>
+
+    <sql id="selectAiRecordFileRelationVo">
+        select relation_id, record_id, field_id, file_path, file_name, file_size, file_type, upload_time, del_flag, create_by, create_time, update_by, update_time, remark from ai_record_file_relation
+    </sql>
+
+    <select id="selectAiRecordFileRelationList" parameterType="com.ruoyi.workspace.domain.AiRecordFileRelation" resultMap="AiRecordFileRelationResult">
+        <include refid="selectAiRecordFileRelationVo"/>
+        <where>
+            <if test="recordId != null "> and record_id = #{recordId}</if>
+            <if test="fieldId != null "> and field_id = #{fieldId}</if>
+            <if test="fileName != null  and fileName != ''"> and file_name like concat('%', #{fileName}, '%')</if>
+            <if test="fileType != null  and fileType != ''"> and file_type = #{fileType}</if>
+            and del_flag = '0'
+        </where>
+        order by upload_time desc
+    </select>
+
+    <select id="selectAiRecordFileRelationByRelationId" parameterType="Long" resultMap="AiRecordFileRelationResult">
+        <include refid="selectAiRecordFileRelationVo"/>
+        where relation_id = #{relationId} and del_flag = '0'
+    </select>
+
+    <insert id="insertAiRecordFileRelation" parameterType="com.ruoyi.workspace.domain.AiRecordFileRelation" useGeneratedKeys="true" keyProperty="relationId">
+        insert into ai_record_file_relation
+        <trim prefix="(" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">record_id,</if>
+            <if test="fieldId != null">field_id,</if>
+            <if test="filePath != null and filePath != ''">file_path,</if>
+            <if test="fileName != null and fileName != ''">file_name,</if>
+            <if test="fileSize != null">file_size,</if>
+            <if test="fileType != null and fileType != ''">file_type,</if>
+            upload_time,
+            <if test="delFlag != null and delFlag != ''">del_flag,</if>
+            <if test="createBy != null and createBy != ''">create_by,</if>
+            create_time,
+            <if test="remark != null">remark,</if>
+         </trim>
+        <trim prefix="values (" suffix=")" suffixOverrides=",">
+            <if test="recordId != null">#{recordId},</if>
+            <if test="fieldId != null">#{fieldId},</if>
+            <if test="filePath != null and filePath != ''">#{filePath},</if>
+            <if test="fileName != null and fileName != ''">#{fileName},</if>
+            <if test="fileSize != null">#{fileSize},</if>
+            <if test="fileType != null and fileType != ''">#{fileType},</if>
+            sysdate(),
+            <if test="delFlag != null and delFlag != ''">#{delFlag},</if>
+            <if test="createBy != null and createBy != ''">#{createBy},</if>
+            sysdate(),
+            <if test="remark != null">#{remark},</if>
+         </trim>
+    </insert>
+
+    <update id="updateAiRecordFileRelation" parameterType="com.ruoyi.workspace.domain.AiRecordFileRelation">
+        update ai_record_file_relation
+        <trim prefix="SET" suffixOverrides=",">
+            <if test="recordId != null">record_id = #{recordId},</if>
+            <if test="fieldId != null">field_id = #{fieldId},</if>
+            <if test="filePath != null and filePath != ''">file_path = #{filePath},</if>
+            <if test="fileName != null and fileName != ''">file_name = #{fileName},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="fileType != null and fileType != ''">file_type = #{fileType},</if>
+            <!-- upload_time is generally not updated -->
+            <if test="updateBy != null and updateBy != ''">update_by = #{updateBy},</if>
+            update_time = sysdate(),
+            <if test="remark != null">remark = #{remark},</if>
+        </trim>
+        where relation_id = #{relationId}
+    </update>
+
+    <update id="deleteAiRecordFileRelationByRelationId" parameterType="Long">
+        update ai_record_file_relation set del_flag = '2' where relation_id = #{relationId}
+    </update>
+
+    <update id="deleteAiRecordFileRelationByRelationIds" parameterType="String">
+        update ai_record_file_relation set del_flag = '2' where relation_id in
+        <foreach item="relationId" collection="array" open="(" separator="," close=")">
+            #{relationId}
+        </foreach>
+    </update>
+
+    <update id="deleteAiRecordFileRelationByRecordIds" parameterType="String">
+        update ai_record_file_relation set del_flag = '2' where record_id in
+        <foreach item="recordId" collection="array" open="(" separator="," close=")">
+            #{recordId}
+        </foreach>
+    </update>
+
+    <update id="deleteAiRecordFileRelationByFieldIds" parameterType="String">
+        update ai_record_file_relation set del_flag = '2' where field_id in
+        <foreach item="fieldId" collection="array" open="(" separator="," close=")">
+            #{fieldId}
+        </foreach>
+    </update>
+
+</mapper>
