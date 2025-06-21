@@ -124,10 +124,10 @@
 <script lang="ts">
 import { defineComponent, reactive, ref, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { PageHeader, Form, Input, Button, Textarea, Divider, List, Modal, Select, Popconfirm, message } from 'ant-design-vue';
+import { PageHeader, Form, Input, Button, Textarea, Divider, List, Modal, Select, Popconfirm, message, Row, Col } from 'ant-design-vue';
 import { BulbOutlined, RobotOutlined, PlusOutlined } from '@ant-design/icons-vue';
-import type { TableField } from '../types'; // Assuming TableField is defined in types
-// import axios from 'axios'; // For actual API calls
+import type { TableField } from '../types';
+import { generateTableDescriptionAI, suggestTableFieldsAI, createTableAPI, addFieldsToTableAPI } from '../services/tableService';
 
 export default defineComponent({
   name: 'TableCreateView',
@@ -135,6 +135,7 @@ export default defineComponent({
     APageHeader: PageHeader, AForm: Form, AFormItem: Form.Item, AInput: Input, AButton: Button,
     ATextarea: Textarea, ADivider: Divider, AList: List, AListItem: List.Item, AListItemMeta: List.Item.Meta,
     AModal: Modal, ASelect: Select, ASelectOption: Select.Option, APopconfirm: Popconfirm,
+    ARow: Row, ACol: Col, // Added Row and Col
     BulbOutlined, RobotOutlined, PlusOutlined,
   },
   setup() {
@@ -173,14 +174,15 @@ export default defineComponent({
         return;
       }
       generatingDescription.value = true;
-      // Mock AI call
-      // const response = await axios.post(`/api/workspace/table/0/ai-generate-description`, { tableName: tableForm.tableName });
-      // tableForm.tableDescription = response.data.data;
-      setTimeout(() => {
-        tableForm.tableDescription = `这是为"${tableForm.tableName}"AI智能生成的描述：一个用于管理和跟踪相关信息的综合数据表。`;
-        generatingDescription.value = false;
+      try {
+        const description = await generateTableDescriptionAI('0', tableForm.tableName);
+        tableForm.tableDescription = description;
         message.success('AI描述已生成！');
-      }, 1000);
+      } catch (error: any) {
+        message.error('AI描述生成失败: ' + error.message);
+      } finally {
+        generatingDescription.value = false;
+      }
     };
 
     const suggestFields = async () => {
@@ -189,26 +191,22 @@ export default defineComponent({
         return;
       }
       suggestingFields.value = true;
-      // Mock AI call
-      // const response = await axios.post(`/api/workspace/table/0/field/ai-suggest`, { tableName: tableForm.tableName, tableDescription: tableForm.tableDescription });
-      // aiSuggestedFields.value = response.data.data;
-      setTimeout(() => {
-        aiSuggestedFields.value = [
-          { fieldId: 'temp1', tableId: '', fieldName: 'itemName', fieldLabel: '项目名称', fieldType: 'text', sortOrder: 1, isRequired: true, fieldDescription: '物品或任务的名称' },
-          { fieldId: 'temp2', tableId: '', fieldName: 'quantity', fieldLabel: '数量', fieldType: 'number', sortOrder: 2, isRequired: true, fieldDescription: '项目的数量' },
-          { fieldId: 'temp3', tableId: '', fieldName: 'status', fieldLabel: '状态', fieldType: 'select', sortOrder: 3, isRequired: false, fieldDescription: '当前状态' },
-          { fieldId: 'temp4', tableId: '', fieldName: 'dueDate', fieldLabel: '截止日期', fieldType: 'date', sortOrder: 4, isRequired: false, fieldDescription: '任务或项目的截止日期' },
-        ];
-        suggestingFields.value = false;
+      try {
+        const suggested = await suggestTableFieldsAI('0', tableForm.tableName, tableForm.tableDescription);
+        aiSuggestedFields.value = suggested.map(f => ({...f, fieldId: String(Date.now() + Math.random()) })); // Give temp unique frontend IDs
         message.success('AI字段推荐已加载！');
-      }, 1000);
+      } catch (error: any) {
+        message.error('AI字段推荐失败: ' + error.message);
+        aiSuggestedFields.value = [];
+      } finally {
+        suggestingFields.value = false;
+      }
     };
 
     const addFieldToTable = (field: TableField, index: number) => {
-      // Avoid adding duplicates by fieldName
       if (!tableForm.fields.find(f => f.fieldName === field.fieldName)) {
-        tableForm.fields.push({ ...field, fieldId: String(Date.now()) }); // Use new temp ID
-        aiSuggestedFields.value.splice(index, 1); // Remove from suggestions
+        tableForm.fields.push({ ...field, fieldId: String(Date.now()) });
+        aiSuggestedFields.value.splice(index, 1);
       } else {
         message.warning(`字段 '${field.fieldName}' 已存在于表中。`);
       }
@@ -224,13 +222,13 @@ export default defineComponent({
             return;
         }
         const newField: TableField = {
-            fieldId: String(Date.now()), // Temporary ID
-            tableId: '', // Will be set upon table creation
+            fieldId: String(Date.now()),
+            tableId: '',
             fieldName: manualFieldForm.fieldName!,
             fieldLabel: manualFieldForm.fieldLabel!,
             fieldType: manualFieldForm.fieldType!,
             fieldDescription: manualFieldForm.fieldDescription,
-            isRequired: false, // Default
+            isRequired: false,
             sortOrder: tableForm.fields.length + 1,
         };
         if (!tableForm.fields.find(f => f.fieldName === newField.fieldName)) {
@@ -252,26 +250,36 @@ export default defineComponent({
         return;
       }
       creatingTable.value = true;
-      const payload = {
-        workspaceId: workspaceId.value,
-        tableName: tableForm.tableName,
-        tableDescription: tableForm.tableDescription,
-        fields: tableForm.fields.map(f => ({...f, fieldId: undefined})) // Remove temp frontend fieldIds
-      };
-      console.log('Creating table with payload:', payload);
-      // Mock API Call
-      // await axios.post(`/api/workspace/table/workspace/${workspaceId.value}`, payload);
-      setTimeout(() => {
+      try {
+        const tablePayload = {
+          workspaceId: workspaceId.value,
+          tableName: tableForm.tableName,
+          tableDescription: tableForm.tableDescription,
+        };
+        const createdTable = await createTableAPI(tablePayload);
+        message.success(`数据表 "${createdTable.tableName}" 元数据创建成功! ID: ${createdTable.tableId}`);
+
+        if (createdTable.tableId && tableForm.fields.length > 0) {
+          const fieldsPayload = tableForm.fields.map(f => {
+            const { fieldId, ...rest } = f;
+            return { ...rest, tableId: createdTable.tableId };
+          });
+          await addFieldsToTableAPI(String(createdTable.tableId), fieldsPayload);
+          message.success(`字段成功添加到表 "${createdTable.tableName}"!`);
+        }
+
+        router.push(`/workspace`); // Or to a table list page for the current workspace e.g. `/workspace/${workspaceId.value}/tables`
+      } catch (error: any) {
+        message.error('创建数据表过程中发生错误: ' + error.message);
+      } finally {
         creatingTable.value = false;
-        message.success(`数据表 "${tableForm.tableName}" 创建成功 (模拟)`);
-        router.push(`/workspace/${workspaceId.value}/tables`); // Navigate to table list or details for this workspace
-      }, 1500);
+      }
     };
 
     onMounted(() => {
         if (!workspaceId.value) {
             message.error("未指定工作空间ID！将返回上一页。");
-            // router.push('/workspace'); // Or handle error appropriately
+            // router.push('/workspace');
         }
     });
 
@@ -298,7 +306,7 @@ export default defineComponent({
 
 <style scoped>
 .table-create-page {
-  padding: 0 24px 24px 24px; /* No top padding, relying on PageHeader */
+  padding: 0 24px 24px 24px;
 }
 .table-create-form {
   background: #fff;

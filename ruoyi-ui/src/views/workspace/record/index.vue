@@ -150,7 +150,8 @@
 </template>
 
 <script>
-// import { listRecord, getRecord, delRecord, exportRecord } from "@/api/workspace/record"; // To be created
+// Import API functions for data record
+import { listRecord, getRecord, delRecord } from "@/api/workspace/record";
 
 export default {
   name: "DataRecordManagement",
@@ -172,30 +173,32 @@ export default {
         createBy: undefined,
         status: undefined
       },
-      form: {}, // For viewing record details
+      form: {},
     };
   },
   created() {
+    // Check if tableId is passed as a query parameter to the route
+    const tableIdFromQuery = this.$route.query.tableId;
+    if (tableIdFromQuery) {
+        this.queryParams.tableId = tableIdFromQuery;
+    }
     this.getList();
   },
   methods: {
     getList() {
       this.loading = true;
-      // Replace with: listRecord(this.queryParams).then(response => { ... });
-      setTimeout(() => { // Mock API call
-        this.dataRecordList = [
-          { recordId: 1001, tableId: 101, recordData: JSON.stringify({name: "张三", age: 30, email: "zhangsan@example.com"}), createBy: "admin", createTime: new Date(), status: "0", remark:"First record" },
-          { recordId: 1002, tableId: 101, recordData: JSON.stringify({name: "李四", age: 25, email: "lisi@example.com"}), createBy: "user1", createTime: new Date(), status: "0", remark:"" },
-          { recordId: 2001, tableId: 201, recordData: JSON.stringify({task: "完成报告", assignee: "王五", dueDate: "2024-08-15"}), createBy: "user1", createTime: new Date(), status: "0", remark:"" }
-        ];
-        this.total = this.dataRecordList.length;
+      listRecord(this.queryParams).then(response => {
+        this.dataRecordList = response.rows;
+        this.total = response.total;
         this.loading = false;
-      }, 500);
+      }).catch(() => {
+        this.loading = false;
+      });
     },
     getRecordDataPreview(jsonData) {
+      // ... (existing method, no changes needed for API integration) ...
       try {
         const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
-        // Show first 2-3 keys as preview, or just a snippet of the string
         const keys = Object.keys(data);
         if (keys.length > 0) {
           return keys.slice(0,2).map(key => `${key}: ${data[key]}`).join(', ') + (keys.length > 2 ? '...' : '');
@@ -206,20 +209,25 @@ export default {
       }
     },
     formatJson(jsonData) {
+      // ... (existing method, no changes needed for API integration) ...
       try {
         const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
         return JSON.stringify(data, null, 2);
       } catch (e) {
-        return jsonData; // Return as is if not valid JSON
+        return jsonData;
       }
     },
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
-      this.$modal.msgSuccess("搜索操作（模拟）");
     },
     resetQuery() {
       this.resetForm("queryForm");
+      // After resetting, if a tableId was initially passed via route query, restore it.
+      const tableIdFromQuery = this.$route.query.tableId;
+      if (tableIdFromQuery) {
+        this.queryParams.tableId = tableIdFromQuery;
+      }
       this.handleQuery();
     },
     handleSelectionChange(selection) {
@@ -227,27 +235,27 @@ export default {
       this.multiple = !selection.length;
     },
     handleView(row) {
-      this.form = { ...row };
-      this.openView = true;
-      this.title = "数据记录详情";
+      this.form = {}; // Clear previous
+      const recordId = row.recordId || this.ids[0];
+      getRecord(recordId).then(response => {
+        this.form = response.data; // Assuming response.data is the AiDataRecord object
+        this.openView = true;
+        this.title = "数据记录详情";
+      });
     },
     handleDelete(row) {
       const recordIds = row.recordId || this.ids;
-      this.$modal.confirm('是否确认删除数据记录编号为"' + recordIds + '"的数据项？').then(() => {
-        // Replace with: return delRecord(recordIds);
-        return new Promise(resolve => setTimeout(resolve, 500)); // Mock async
+      this.$modal.confirm('是否确认删除数据记录编号为"' + recordIds + '"的数据项？这将同时删除关联的文件记录。').then(function() {
+        return delRecord(recordIds);
       }).then(() => {
         this.getList();
-        this.$modal.msgSuccess("删除成功 (模拟)");
+        this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
     handleExport() {
-      // Exporting records with JSON data needs careful consideration for format.
-      // This might involve a more complex export logic or server-side processing.
-      this.download('workspace/record/export', {
+      this.download('workspace/record/export', { // Path matches AiDataRecordController @PostMapping("/export")
         ...this.queryParams
       }, `datarecord_${new Date().getTime()}.xlsx`);
-      this.$modal.msgSuccess("导出操作（模拟） - 调用下载方法. 实际导出JSON数据需特殊处理.");
     }
   }
 };

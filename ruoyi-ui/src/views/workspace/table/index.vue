@@ -149,8 +149,8 @@
 </template>
 
 <script>
-// Import API functions for data table (to be created in @/api/workspace/table.js)
-// import { listTable, getTable, delTable, exportTable } from "@/api/workspace/table";
+// Import API functions for data table
+import { listTable, getTable, delTable } from "@/api/workspace/table";
 
 export default {
   name: "DataTableManagement",
@@ -159,13 +159,13 @@ export default {
     return {
       loading: true,
       ids: [],
-      single: true, // Not used as no edit for single
+      // single: true, // Not used as no single edit action by default
       multiple: true,
       showSearch: true,
       total: 0,
       dataTableList: [],
       title: "",
-      openView: false, // For details dialog
+      openView: false,
       queryParams: {
         pageNum: 1,
         pageSize: 10,
@@ -173,7 +173,7 @@ export default {
         tableName: undefined,
         status: undefined
       },
-      form: {}, // For storing details of the table being viewed
+      form: {},
     };
   },
   created() {
@@ -182,21 +182,17 @@ export default {
   methods: {
     getList() {
       this.loading = true;
-      // Replace with: listTable(this.queryParams).then(response => { ... });
-      setTimeout(() => { // Mock API call
-        this.dataTableList = [
-          { tableId: 101, workspaceId: 1, tableName: "客户表", tableDescription: "存储客户基本信息", createBy: "admin", createTime: new Date(), status: "0", remark: "Initial table" },
-          { tableId: 102, workspaceId: 1, tableName: "订单表", tableDescription: "客户订单数据", createBy: "admin", createTime: new Date(), status: "0", remark: "" },
-          { tableId: 201, workspaceId: 2, tableName: "任务列表", tableDescription: "项目Alpha的任务跟踪", createBy: "user1", createTime: new Date(), status: "0", remark: "" }
-        ];
-        this.total = this.dataTableList.length;
+      listTable(this.queryParams).then(response => {
+        this.dataTableList = response.rows;
+        this.total = response.total;
         this.loading = false;
-      }, 500);
+      }).catch(() => {
+        this.loading = false;
+      });
     },
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
-      this.$modal.msgSuccess("搜索操作（模拟）");
     },
     resetQuery() {
       this.resetForm("queryForm");
@@ -207,25 +203,27 @@ export default {
       this.multiple = !selection.length;
     },
     handleView(row) {
-      this.form = { ...row }; // Use a copy
-      this.openView = true;
-      this.title = "数据表详情";
+      this.form = {}; // Clear previous form data
+      const tableId = row.tableId || this.ids[0]; // Should only be one if called from row
+      getTable(tableId).then(response => {
+        this.form = response.data; // Assuming response.data is the AiDataTable object
+        this.openView = true;
+        this.title = "数据表详情";
+      });
     },
     handleDelete(row) {
       const tableIds = row.tableId || this.ids;
-      this.$modal.confirm('是否确认删除数据表编号为"' + tableIds + '"的数据项？').then(() => {
-        // Replace with: return delTable(tableIds);
-         return new Promise(resolve => setTimeout(resolve, 500)); // Mock async
+      this.$modal.confirm('是否确认删除数据表编号为"' + tableIds + '"的数据项？这将同时删除相关字段和记录。').then(function() {
+        return delTable(tableIds);
       }).then(() => {
         this.getList();
-        this.$modal.msgSuccess("删除成功 (模拟)");
+        this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
     handleExport() {
-      this.download('workspace/table/export', { // Matches backend controller
+      this.download('workspace/table/export', { // Path matches AiDataTableController @PostMapping("/export")
         ...this.queryParams
       }, `datatable_${new Date().getTime()}.xlsx`);
-      this.$modal.msgSuccess("导出操作（模拟） - 调用下载方法");
     }
   }
 };

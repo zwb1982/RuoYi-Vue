@@ -150,13 +150,12 @@
 </template>
 
 <script>
-// Import API functions for workspace (to be created)
-// import { listWorkspace, getWorkspace, delWorkspace, addWorkspace, updateWorkspace } from "@/api/workspace/workspace";
-// For now, we'll mock the data and functions.
+// Import API functions for workspace
+import { listWorkspace, getWorkspace, delWorkspace, addWorkspace, updateWorkspace } from "@/api/workspace/workspace";
 
 export default {
   name: "WorkspaceManagement",
-  dicts: ['sys_normal_disable'], // Reference system dictionary for status
+  dicts: ['sys_normal_disable'],
   data() {
     return {
       // Loading state
@@ -172,28 +171,27 @@ export default {
       // Total records
       total: 0,
       // Workspace data
-      workspaceList: [],
+      workspaceList: [], // Will be populated by API
       // Dialog title
       title: "",
       // Show dialog
       open: false,
-      // Query parameters
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         workspaceName: undefined,
         createBy: undefined,
-        status: undefined
+        status: undefined // Ensure this matches the AiWorkspace domain if filtering by status
       },
       // Form data
-      form: {},
+      form: {}, // Reset in handleAdd/handleUpdate
       // Form validation rules
       rules: {
         workspaceName: [
           { required: true, message: "工作空间名称不能为空", trigger: "blur" }
         ],
-        status: [
-          { required: true, message: "状态不能为空", trigger: "blur" }
+        status: [ // Assuming status is part of the form and required
+          { required: true, message: "状态不能为空", trigger: "change" } // Or "blur"
         ]
       }
     };
@@ -205,15 +203,14 @@ export default {
     /** Query workspace list */
     getList() {
       this.loading = true;
-      // Replace with actual API call: listWorkspace(this.queryParams).then(response => { ... });
-      setTimeout(() => { // Mock API call
-        this.workspaceList = [
-          { workspaceId: 1, workspaceName: "默认工作空间", description: "系统默认创建", createBy: "admin", createTime: new Date(), status: "0", remark: "这是一个备注" },
-          { workspaceId: 2, workspaceName: "项目Alpha", description: "Alpha项目专用", createBy: "user1", createTime: new Date(), status: "0", remark: "" }
-        ];
-        this.total = this.workspaceList.length;
+      listWorkspace(this.queryParams).then(response => {
+        this.workspaceList = response.rows;
+        this.total = response.total;
         this.loading = false;
-      }, 500);
+      }).catch(() => {
+        this.loading = false;
+        // Optional: this.$modal.msgError("获取列表失败");
+      });
     },
     // Cancel button
     cancel() {
@@ -226,12 +223,7 @@ export default {
         workspaceId: undefined,
         workspaceName: undefined,
         description: undefined,
-        status: "0", // Default status
-        delFlag: undefined,
-        createBy: undefined,
-        createTime: undefined,
-        updateBy: undefined,
-        updateTime: undefined,
+        status: "0", // Default status for new items
         remark: undefined
       };
       this.resetForm("form");
@@ -240,7 +232,6 @@ export default {
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
-      this.$modal.msgSuccess("搜索操作（模拟）");
     },
     /** Reset button action */
     resetQuery() {
@@ -263,54 +254,48 @@ export default {
     handleUpdate(row) {
       this.reset();
       const workspaceId = row.workspaceId || this.ids[0];
-      // Replace with: getWorkspace(workspaceId).then(response => { ... });
-      const mockData = this.workspaceList.find(w => w.workspaceId === workspaceId);
-      this.form = mockData ? { ...mockData } : {}; // Copy
-      this.open = true;
-      this.title = "修改AI工作空间";
+      getWorkspace(workspaceId).then(response => {
+        this.form = response.data; // Assuming response.data is the AiWorkspace object
+        this.open = true;
+        this.title = "修改AI工作空间";
+      });
     },
     /** Submit button action */
     submitForm() {
       this.$refs["form"].validate(valid => {
         if (valid) {
-          this.loading = true;
+          // this.loading = true; // Consider a different loading var for dialog submit, e.g. this.submitLoading = true
           if (this.form.workspaceId != null) {
-            // Replace with: updateWorkspace(this.form).then(response => { ... });
-            setTimeout(() => {
-              this.$modal.msgSuccess("修改成功 (模拟)");
+            updateWorkspace(this.form).then(response => {
+              this.$modal.msgSuccess("修改成功");
               this.open = false;
               this.getList();
-              this.loading = false;
-            }, 500);
+            }); // .finally(() => { this.submitLoading = false; });
           } else {
-            // Replace with: addWorkspace(this.form).then(response => { ... });
-            setTimeout(() => {
-              this.$modal.msgSuccess("新增成功 (模拟)");
+            addWorkspace(this.form).then(response => {
+              this.$modal.msgSuccess("新增成功");
               this.open = false;
               this.getList();
-              this.loading = false;
-            }, 500);
+            }); // .finally(() => { this.submitLoading = false; });
           }
         }
       });
     },
     /** Delete button action */
     handleDelete(row) {
-      const workspaceIds = row.workspaceId || this.ids;
-      this.$modal.confirm('是否确认删除AI工作空间编号为"' + workspaceIds + '"的数据项？').then(() => {
-        // Replace with: return delWorkspace(workspaceIds);
-        return new Promise(resolve => setTimeout(resolve, 500)); // Mock async
+      const workspaceIds = row.workspaceId || this.ids; // Can be array or single ID for backend
+      this.$modal.confirm('是否确认删除AI工作空间编号为"' + workspaceIds + '"的数据项？').then(function() {
+        return delWorkspace(workspaceIds);
       }).then(() => {
         this.getList();
-        this.$modal.msgSuccess("删除成功 (模拟)");
+        this.$modal.msgSuccess("删除成功");
       }).catch(() => {});
     },
     /** Export button action */
     handleExport() {
-       this.download('workspace/workspace/export', { // Matches backend controller path
+      this.download('workspace/workspace/export', { // Path matches AiWorkspaceController @PostMapping("/export")
         ...this.queryParams
       }, `workspace_${new Date().getTime()}.xlsx`)
-      this.$modal.msgSuccess("导出操作（模拟） - 调用下载方法");
     }
   }
 };

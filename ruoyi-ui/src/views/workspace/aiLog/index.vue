@@ -110,7 +110,8 @@
 </template>
 
 <script>
-// import { listAiLog, getAiLog, exportAiLog } from "@/api/workspace/aiLog"; // To be created
+// Import API functions for AI log
+import { listAiLog, getAiLog } from "@/api/workspace/aiLog";
 
 export default {
   name: "AiCallLog",
@@ -122,16 +123,18 @@ export default {
       aiLogList: [],
       title: "",
       openView: false,
-      dateRange: [], // For date range picker
+      dateRange: [],
       queryParams: {
         pageNum: 1,
         pageSize: 10,
         serviceName: undefined,
         username: undefined,
         success: undefined,
-        // params will also include date range if set
+        // Backend will need to parse params for date range:
+        // params['beginTime'] = this.dateRange[0];
+        // params['endTime'] = this.dateRange[1];
       },
-      form: {}, // For viewing log details
+      form: {},
     };
   },
   created() {
@@ -140,20 +143,26 @@ export default {
   methods: {
     getList() {
       this.loading = true;
-      // Add date range to query params
-      const query = this.addDateRange(this.queryParams, this.dateRange);
-      // Replace with: listAiLog(query).then(response => { ... });
-      setTimeout(() => { // Mock API call
+      // The backend AiLogController and its list method are not yet implemented.
+      // This call will fail until they are.
+      listAiLog(this.addDateRange(this.queryParams, this.dateRange)).then(response => {
+        this.aiLogList = response.rows;
+        this.total = response.total;
+        this.loading = false;
+      }).catch(() => {
+        this.loading = false;
+        this.$modal.msgError("获取AI调用日志失败 (后端接口可能未实现)");
+        // Keep mock data for now to show UI structure if API fails
         this.aiLogList = [
           { logId: 1, serviceName: "generateTableDescription", username: "admin", callTime: new Date(Date.now() - 3600000), duration: 1200, success: true, requestPayload: {tableName: "客户表"}, responsePayload: {description: "AI生成的描述..."} },
           { logId: 2, serviceName: "generateFieldSuggestions", username: "user1", callTime: new Date(Date.now() - 7200000), duration: 2500, success: true, requestPayload: {tableName: "订单表", tableDescription: "客户订单"}, responsePayload: [{fieldName: "orderId"}, {fieldName: "amount"}] },
           { logId: 3, serviceName: "extractDataFromText", username: "admin", callTime: new Date(), duration: 800, success: false, requestPayload: {text: "...", tableId: 101}, responsePayload: null, errorMessage: "API rate limit exceeded" }
         ];
         this.total = this.aiLogList.length;
-        this.loading = false;
-      }, 500);
+      });
     },
     formatJson(jsonData) {
+      // ... (existing method) ...
       if (jsonData === null || jsonData === undefined) return 'N/A';
       try {
         const data = typeof jsonData === 'string' ? JSON.parse(jsonData) : jsonData;
@@ -165,7 +174,6 @@ export default {
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
-      this.$modal.msgSuccess("搜索操作（模拟）");
     },
     resetQuery() {
       this.dateRange = [];
@@ -173,16 +181,25 @@ export default {
       this.handleQuery();
     },
     handleView(row) {
-      this.form = { ...row };
-      this.openView = true;
-      this.title = "AI调用日志详情";
+      this.form = {}; // Clear
+      // This call will fail until backend is implemented
+      getAiLog(row.logId).then(response => {
+        this.form = response.data; // Assuming response.data is the AiLog object
+        this.openView = true;
+        this.title = "AI调用日志详情";
+      }).catch(() => {
+         this.$modal.msgError("获取日志详情失败 (后端接口可能未实现)");
+         // Fallback to row data for display if API fails
+         this.form = { ...row };
+         this.openView = true;
+         this.title = "AI调用日志详情 (本地数据)";
+      });
     },
     handleExport() {
-      const query = this.addDateRange(this.queryParams, this.dateRange);
-      this.download('workspace/aiLog/export', { // Assuming backend controller path
-        ...query
+      // This call will fail until backend export for AI Log is implemented
+      this.download('workspace/aiLog/export', {
+        ...this.addDateRange(this.queryParams, this.dateRange)
       }, `ailog_${new Date().getTime()}.xlsx`);
-       this.$modal.msgSuccess("导出操作（模拟）");
     }
   }
 };

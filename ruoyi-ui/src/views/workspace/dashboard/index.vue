@@ -60,18 +60,19 @@
 </template>
 
 <script>
-// import { getDashboardStats } from "@/api/workspace/dashboard"; // To be created
+// Import API functions for dashboard
+import { getDashboardStats } from "@/api/workspace/dashboard";
 
 export default {
   name: "WorkspaceDashboard",
   data() {
     return {
-      loading: true,
+      loading: true, // Can use this to show loading state for stats
       stats: {
         workspaceCount: 0,
         tableCount: 0,
         recordCount: 0,
-        aiCallCountToday: 0
+        aiCallCountToday: 0 // This one in particular would come from AI log aggregation
       }
     };
   },
@@ -81,16 +82,30 @@ export default {
   methods: {
     fetchStats() {
       this.loading = true;
-      // Replace with: getDashboardStats().then(response => { this.stats = response.data; ... });
-      setTimeout(() => { // Mock API call
+      // This backend endpoint /workspace/dashboard/stats is conceptual
+      getDashboardStats().then(response => {
+        // Assuming response.data directly contains the stats object
+        // e.g., { workspaceCount: 10, tableCount: 50, ... }
+        if (response.code === 200) { // Standard RuoYi AjaxResult check
+             this.stats = response.data;
+        } else {
+            this.$modal.msgError("获取仪表盘数据失败: " + response.msg);
+            this.loadMockStats(); // Fallback
+        }
+        this.loading = false;
+      }).catch(() => {
+        this.loading = false;
+        this.$modal.msgError("获取仪表盘数据失败 (后端接口可能未实现)");
+        this.loadMockStats(); // Fallback
+      });
+    },
+    loadMockStats() { // Method to load mock data on API error
         this.stats = {
           workspaceCount: 15,
           tableCount: 128,
           recordCount: 15760,
           aiCallCountToday: 230
         };
-        this.loading = false;
-      }, 500);
     }
   }
 };

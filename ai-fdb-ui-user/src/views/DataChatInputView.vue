@@ -70,7 +70,7 @@
               </a-descriptions-item>
             </a-descriptions>
             <div class="extracted-data-actions" style="margin-top: 16px; text-align: right;">
-              <a-button @click="reExtract" style="margin-right: 8px;" :disabled="!lastUserMessageContent">
+              <a-button @click="reExtract" style="margin-right: 8px;" :disabled="!lastUserMessageContent && !lastUserFile">
                 重新提取
               </a-button>
               <a-button type="primary" @click="confirmAndSaveData">
@@ -90,7 +90,9 @@ import { useRoute, useRouter } from 'vue-router';
 import { PageHeader, Input, Button, Upload, Descriptions, Card, Spin, message, UploadChangeParam, UploadFile } from 'ant-design-vue';
 import { UserOutlined, RobotOutlined, PaperClipOutlined, InfoCircleOutlined } from '@ant-design/icons-vue';
 import type { TableField } from '../types';
-// import axios from 'axios';
+import { fetchTableFieldsAPI } from '../services/tableService';
+import { extractDataAI, createRecordAPI } from '../services/recordService';
+
 
 interface Message {
   id: string;
@@ -118,11 +120,11 @@ export default defineComponent({
     const messagesContainerRef = ref<HTMLElement | null>(null);
     const messages = ref<Message[]>([]);
     const userInput = ref('');
-    const processingMessage = ref(false);
-    const extracting = ref(false);
+    const processingMessage = ref(false); // General loading for send message and save
+    const extracting = ref(false); // Specific for AI extraction phase
     const isDataExtracted = ref(false);
     const extractedData = reactive<ExtractedData>({});
-    const fieldsForTable = ref<TableField[]>([]); // To be fetched based on tableId
+    const fieldsForTable = ref<TableField[]>([]);
     const lastUserMessageContent = ref<string | null>(null);
     const lastUserFile = ref<File | null>(null);
 
@@ -136,16 +138,16 @@ export default defineComponent({
     };
 
     const fetchTableFields = async () => {
-      // Mock: In a real app, fetch fields for tableId
-      // const response = await axios.get(`/api/workspace/field/list?tableId=${tableId.value}`);
-      // fieldsForTable.value = response.data.rows;
-      setTimeout(() => {
-        fieldsForTable.value = [
-          { fieldId: 'f1', tableId: tableId.value, fieldName: 'productName', fieldLabel: '产品名称', fieldType: 'text', sortOrder: 1, isRequired: true },
-          { fieldId: 'f2', tableId: tableId.value, fieldName: 'quantity', fieldLabel: '数量', fieldType: 'number', sortOrder: 2, isRequired: true },
-          { fieldId: 'f3', tableId: tableId.value, fieldName: 'customerNotes', fieldLabel: '客户备注', fieldType: 'rich_text', sortOrder: 3, isRequired: false },
-        ];
-      }, 500);
+      processingMessage.value = true;
+      try {
+        const fields = await fetchTableFieldsAPI(tableId.value);
+        fieldsForTable.value = fields.map(f => ({...f, fieldId: String(f.fieldId) }));
+      } catch (error: any) {
+        message.error('加载表字段失败: ' + error.message);
+        fieldsForTable.value = [];
+      } finally {
+        processingMessage.value = false;
+      }
     };
 
     onMounted(() => {
@@ -165,20 +167,23 @@ export default defineComponent({
     };
 
     const handleFileUpload = (file: File) => {
-      addMessage('user', `上传了文件: ${file.name}`, { name: file.name, size: file.size, type: file.type, raw: file });
+      // Display file in chat as user message part
+      // Actual file processing will happen when sendMessage is called if text is also present,
+      // or could trigger processWithAI directly if desired.
+      // For now, we just store it and let sendMessage handle it.
       lastUserFile.value = file;
-      // Process file immediately or wait for text message? For now, just adds to chat.
-      // Can trigger AI extraction if only file is provided.
-      // For this mock, we assume text is still primary trigger for AI.
-      // Prevent actual upload by returning false or a Promise that resolves to false
-      return false;
+      addMessage('user', `已选择文件: ${file.name}`, { name: file.name, size: file.size, type: file.type, raw: file });
+      userInput.value = `请处理文件 ${file.name}。`; // Optional: prefill text area
+      return false; // Prevent actual antd upload component from uploading
     };
 
     const handleUploadChange = (info: UploadChangeParam) => {
-        if (info.file.status === 'done') { // This won't be hit due to beforeUpload returning false
-            message.success(`${info.file.name} file uploaded successfully`);
+        // This is mostly for antd's own state, but since we block actual upload,
+        // it might not be very relevant unless we want to show its internal progress (which we are not).
+        if (info.file.status === 'done') {
+            message.success(`${info.file.name} file selection recorded.`);
         } else if (info.file.status === 'error') {
-            message.error(`${info.file.name} file upload failed.`);
+            message.error(`${info.file.name} file selection failed.`);
         }
     };
 
@@ -187,53 +192,51 @@ export default defineComponent({
       extracting.value = true;
       isDataExtracted.value = false;
 
-      let aiQuery = text;
-      if (file) {
-        aiQuery += `
-[附加文件: ${file.name}]`; // Simplistic representation
-      }
-      addMessage('ai', `正在分析您的输入: "${aiQuery.substring(0,50)}..." 请稍候。`);
+      let aiQueryText = text;
+      let fileNameInfo = file ? file.name : undefined;
 
-      // Mock AI processing & data extraction
-      // In real app: const response = await axios.post('/api/workspace/record/ai-extract', { text: aiQuery, tableId: tableId.value, file: fileData (if sending file content) });
-      // Object.assign(extractedData, response.data.data);
-      setTimeout(() => {
-        const mockExtracted: ExtractedData = {};
-        if (text.toLowerCase().includes('苹果') || (file && file.name.toLowerCase().includes('apple'))) {
-          mockExtracted.productName = '苹果';
-          mockExtracted.quantity = Math.floor(Math.random() * 10) + 1;
-        } else {
-          mockExtracted.productName = '示例产品';
-          mockExtracted.quantity = 1;
-        }
-        if (text.length > 20) mockExtracted.customerNotes = text.substring(0, 20) + "... (备注)";
+      addMessage('ai', `正在分析您的输入: "${aiQueryText.substring(0,50)}..." ${fileNameInfo ? `(文件: ${fileNameInfo})` : ''} 请稍候。`);
 
-        // Clear previous data and assign new
+      try {
+        const extracted = await extractDataAI(aiQueryText, tableId.value, fileNameInfo);
         Object.keys(extractedData).forEach(key => delete extractedData[key]);
-        Object.assign(extractedData, mockExtracted);
-
+        Object.assign(extractedData, extracted);
         isDataExtracted.value = true;
+        addMessage('ai', '数据提取完成！请在右侧面板查看并确认。');
+      } catch (error: any) {
+        message.error('AI提取数据失败: ' + error.message);
+        addMessage('ai', '抱歉，数据提取时遇到问题。');
+      } finally {
         processingMessage.value = false;
         extracting.value = false;
-        addMessage('ai', '数据提取完成！请在右侧面板查看并确认。');
-      }, 2000);
+      }
     };
 
     const sendMessage = () => {
-      if (!userInput.value.trim() && !lastUserFile.value) { // Allow sending if only file was "uploaded"
+      const currentText = userInput.value.trim();
+      if (!currentText && !lastUserFile.value) {
         message.info('请输入信息或上传文件。');
         return;
       }
-      const currentText = userInput.value.trim();
-      if(currentText) addMessage('user', currentText);
 
-      lastUserMessageContent.value = currentText; // Save for re-extract
-      // If a file was just added via handleFileUpload, it's in lastUserFile.
-      // If text is added after file, use both.
+      if(currentText) { // If there's text, add it as a message. File might have been added visually already.
+          if(!lastUserFile.value || messages.value[messages.value.length-1]?.fileInfo?.name !== lastUserFile.value.name) {
+            // If no file OR if the last message wasn't about this specific file, add new user text message.
+            addMessage('user', currentText);
+          } else {
+            // If last message was about this file, maybe append text to it or just use currentText for AI.
+            // For simplicity, we'll just use currentText. The file is already in lastUserFile.
+          }
+      } else if (lastUserFile.value && !currentText) {
+        // If only file is present (text was auto-filled and maybe cleared, or user just uploaded)
+        // The file message is already added by handleFileUpload.
+      }
 
-      processWithAI(currentText, lastUserFile.value);
-      userInput.value = ''; // Clear input after sending
-      // lastUserFile.value = null; // Consume the file for this interaction, or keep for re-extract? Let's keep for re-extract.
+      lastUserMessageContent.value = currentText;
+
+      processWithAI(currentText, lastUserFile.value); // Pass both current text and potentially selected file
+      userInput.value = '';
+      // Do not clear lastUserFile.value here, allow re-extraction with it.
     };
 
     const reExtract = () => {
@@ -246,24 +249,34 @@ export default defineComponent({
     };
 
     const confirmAndSaveData = async () => {
-      console.log('Confirming and saving data:', extractedData);
-      // Mock API Call
-      // await axios.post(`/api/workspace/record/table/${tableId.value}`, { tableId: tableId.value, recordData: extractedData });
-      message.success('数据已保存 (模拟)！');
-      // Clear form or navigate away
-      Object.keys(extractedData).forEach(key => delete extractedData[key]);
-      isDataExtracted.value = false;
-      lastUserMessageContent.value = null;
-      lastUserFile.value = null;
-      messages.value = [ {id: String(Date.now()), type: 'ai', content: '数据已保存。请继续输入新数据。'} ];
+      if (Object.keys(extractedData).length === 0) {
+        message.warn('没有可保存的已提取数据。');
+        return;
+      }
+      processingMessage.value = true;
+      try {
+        await createRecordAPI(tableId.value, extractedData);
+        message.success('数据已成功保存!');
 
+        Object.keys(extractedData).forEach(key => delete extractedData[key]);
+        isDataExtracted.value = false;
+        lastUserMessageContent.value = null;
+        lastUserFile.value = null;
+        messages.value = [];
+        addMessage('ai', '数据已保存。请输入下一条信息。');
+
+      } catch (error: any) {
+        message.error('保存数据失败: ' + error.message);
+      } finally {
+        processingMessage.value = false;
+      }
     };
 
     const goBack = () => router.back();
 
     return {
       workspaceId, tableId, messagesContainerRef, messages, userInput, processingMessage,
-      extractedData, fieldsForTable, isDataExtracted, extracting, lastUserMessageContent,
+      extractedData, fieldsForTable, isDataExtracted, extracting, lastUserMessageContent, lastUserFile,
       sendMessage, handleFileUpload, handleUploadChange, reExtract, confirmAndSaveData, goBack, formatFileSize
     };
   },

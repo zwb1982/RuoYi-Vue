@@ -125,7 +125,8 @@
 </template>
 
 <script>
-// import { listFileRelation, getFileRelation, delFileRelation, exportFileRelation } from "@/api/workspace/file"; // To be created
+// Import API functions for file relation
+import { listFileRelation, getFileRelation, delFileRelation } from "@/api/workspace/file";
 
 export default {
   name: "FileManagement",
@@ -156,17 +157,16 @@ export default {
   methods: {
     getList() {
       this.loading = true;
-      // Replace with: listFileRelation(this.queryParams).then(response => { ... });
-      setTimeout(() => { // Mock API call
-        this.fileRelationList = [
-          { relationId: 1, recordId: 1001, fieldId: 50, fileName: "customer_avatar.jpg", filePath: "/profile/uploads/customer_avatar.jpg", fileSize: 102400, fileType: "image/jpeg", uploadTime: new Date(), createBy: "admin", remark: "Avatar" },
-          { relationId: 2, recordId: 2001, fieldId: 65, fileName: "report_q1.pdf", filePath: "/profile/uploads/report_q1.pdf", fileSize: 2048000, fileType: "application/pdf", uploadTime: new Date(), createBy: "user1", remark: "" }
-        ];
-        this.total = this.fileRelationList.length;
+      listFileRelation(this.queryParams).then(response => {
+        this.fileRelationList = response.rows;
+        this.total = response.total;
         this.loading = false;
-      }, 500);
+      }).catch(() => {
+        this.loading = false;
+      });
     },
     formatFileSize(sizeInBytes) {
+      // ... (existing method, no changes needed) ...
       if (sizeInBytes === null || sizeInBytes === undefined) return '';
       const units = ['B', 'KB', 'MB', 'GB', 'TB'];
       let i = 0;
@@ -177,23 +177,23 @@ export default {
       return sizeInBytes.toFixed(2) + ' ' + units[i];
     },
     isLink(filePath) {
-        // Basic check if it's an absolute URL, could be more robust
-        return filePath && (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('/'));
+      // ... (existing method, no changes needed) ...
+      return filePath && (filePath.startsWith('http://') || filePath.startsWith('https://') || filePath.startsWith('/'));
     },
     makeDownloadableLink(filePath) {
-        // If filePath is already a full URL, use it.
-        // If it's a relative server path like '/profile/...', prepend base URL or handle as needed.
-        // For this mock, assume it might be directly usable if it starts with '/'.
-        if (filePath && filePath.startsWith('/profile')) { // Common RuoYi upload path
-            // return process.env.VUE_APP_BASE_API + filePath; // If served through API gateway
-            return filePath; // Or just the path if served directly by nginx/static server
-        }
+      // ... (existing method, no changes needed) ...
+      if (filePath && filePath.startsWith('/profile')) {
+         // In a real RuoYi setup, '/dev-api' or VUE_APP_BASE_API might be needed if filePath is relative to backend root
+         // For files served from /profile/upload/, they are often directly accessible if nginx is configured.
+         // If using minio or other storage, this would be the direct URL.
+         // Assuming filePath is a relative path that the browser can resolve or an absolute URL.
         return filePath;
+      }
+      return filePath;
     },
     handleQuery() {
       this.queryParams.pageNum = 1;
       this.getList();
-      this.$modal.msgSuccess("搜索操作（模拟）");
     },
     resetQuery() {
       this.resetForm("queryForm");
@@ -204,25 +204,30 @@ export default {
       this.multiple = !selection.length;
     },
     handleView(row) {
-      this.form = { ...row };
-      this.openView = true;
-      this.title = "文件关联详情";
+      this.form = {}; // Clear
+      const relationId = row.relationId || this.ids[0];
+      getFileRelation(relationId).then(response => {
+        this.form = response.data; // Assuming response.data is the AiRecordFileRelation object
+        this.openView = true;
+        this.title = "文件关联详情";
+      });
     },
     handleDelete(row) {
       const relationIds = row.relationId || this.ids;
-      this.$modal.confirm('是否确认删除文件关联记录编号为"' + relationIds + '"的数据项？这将只删除数据库记录，不会删除实际文件。').then(() => {
-        // Replace with: return delFileRelation(relationIds);
-        return new Promise(resolve => setTimeout(resolve, 500)); // Mock async
+      this.$modal.confirm('是否确认删除文件关联记录编号为"' + relationIds + '"的数据项？注意：这只删除数据库记录，不会删除服务器上的实际文件。').then(function() {
+        return delFileRelation(relationIds);
       }).then(() => {
         this.getList();
-        this.$modal.msgSuccess("删除关联记录成功 (模拟)");
+        this.$modal.msgSuccess("删除关联记录成功");
       }).catch(() => {});
     },
     handleExport() {
-      this.download('workspace/file/export', { // Matches backend controller path
+      // Assuming an export endpoint /workspace/file/export exists for metadata export
+      // If not, this would need to be added to AiRecordFileController
+      // Or, implement client-side export of the current table data.
+      this.download('workspace/file/export', {
         ...this.queryParams
-      }, `filerelation_${new Date().getTime()}.xlsx`);
-       this.$modal.msgSuccess("导出列表操作（模拟）");
+      }, `filerelation_metadata_${new Date().getTime()}.xlsx`);
     }
   }
 };
